@@ -3,12 +3,13 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <fstream>
 
 int gScreenWidth = 800;
 int gScreenHeight = 600;
 GLFWwindow * window = nullptr;
 
-// VAO
+// VAOname
 GLuint gVertexArrayObject = 0;
 // VBO
 GLuint gVertexBufferObject = 0;
@@ -16,21 +17,21 @@ GLuint gVertexBufferObject = 0;
 // Program object (for our shader)
 GLuint gGraphicsPipelineShaderProgram = 0;
 
-const std::string gVertexShaderSource = 
-    "#version 410 core\n"
-    "in vec4 position;\n"
-    "void main()\n"
-    "{\n"
-    "   gl_Position = vec4(position.x, position.y, position.z, position.w);\n"
-    "}\n";
+std::string loadShaderAsString(const std::string& filename) {
+    std::string result = "";
 
-const std::string gFragmentShaderSource = 
-    "#version 410 core\n"
-    "out vec4 color;\n"
-    "void main()\n"
-    "{\n"
-    "   color = vec4(1.0f, 0.5f, 0.0f, 1.0f);\n"
-    "}\n";
+    std::string line = "";
+    std::ifstream myFile(filename.c_str());
+
+    if (myFile.is_open()) {
+        while (std::getline(myFile, line)) {
+            result += line + '\n';
+        }
+        myFile.close();
+    }
+
+    return result;
+}
 
 void initialization() {
     if (!glfwInit()) return;
@@ -115,7 +116,10 @@ GLuint createShaderProgram(const std::string& vertexShaderSource, const std::str
 }
 
 void createGraphicsPipeline() {
-    gGraphicsPipelineShaderProgram = createShaderProgram(gVertexShaderSource, gFragmentShaderSource);
+    std::string vertexShaderSource = loadShaderAsString("./shaders/vert.glsl");
+    std::string fragmentShaderSource = loadShaderAsString("./shaders/frag.glsl");
+
+    gGraphicsPipelineShaderProgram = createShaderProgram(vertexShaderSource, fragmentShaderSource);
 }
 
 void PreDraw() {
