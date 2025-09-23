@@ -5,14 +5,16 @@
 #include <string>
 #include <fstream>
 
+
 int gScreenWidth = 800;
 int gScreenHeight = 600;
 GLFWwindow * window = nullptr;
 
-// VAOname
+// VAO
 GLuint gVertexArrayObject = 0;
 // VBO
 GLuint gVertexBufferObject = 0;
+GLuint gVertexBufferObject2 = 0;
 
 // Program object (for our shader)
 GLuint gGraphicsPipelineShaderProgram = 0;
@@ -59,6 +61,12 @@ void vertexSpecification() {
         0.0f, 0.8f, 0.0f
     };
 
+    std::vector<GLfloat> vertexColors {
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+    };
+
     // we start setting things up
     // on the GPU
     glGenVertexArrays(1, &gVertexArrayObject);
@@ -79,8 +87,27 @@ void vertexSpecification() {
                           GL_FALSE,
                           0,
                           (void*)0);
+
+
+    glGenBuffers(1, &gVertexBufferObject2);
+    glBindBuffer(GL_ARRAY_BUFFER, gVertexBufferObject2);
+    glBufferData(GL_ARRAY_BUFFER,
+                 vertexColors.size() * sizeof(GLfloat),
+                 vertexColors.data(),
+                 GL_STATIC_DRAW);
+
+    // Linking the attrib in VAO
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1,
+                          3,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          0,
+                          (void*)0);
+
     glBindVertexArray(0);
     glDisableVertexAttribArray(0); 
+    glDisableVertexAttribArray(1);
 }
 
 GLuint CompileShader(GLuint type, const std::string& source) {
@@ -127,7 +154,7 @@ void PreDraw() {
     glDisable(GL_CULL_FACE);
 
     glViewport(0, 0, gScreenWidth, gScreenHeight);
-    glClearColor(1.f, 1.f, 0.f, 1.f);
+    glClearColor(1.f, 0.f, 0.f, 1.f);
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT );
 
     glUseProgram(gGraphicsPipelineShaderProgram);
