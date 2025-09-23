@@ -14,7 +14,6 @@ GLFWwindow * window = nullptr;
 GLuint gVertexArrayObject = 0;
 // VBO
 GLuint gVertexBufferObject = 0;
-GLuint gVertexBufferObject2 = 0;
 
 // Program object (for our shader)
 GLuint gGraphicsPipelineShaderProgram = 0;
@@ -55,17 +54,15 @@ void initialization() {
 
 void vertexSpecification() {
     // Lives on the CPU
-    std::vector<GLfloat> vertexPosition {
+    std::vector<GLfloat> vertexData {
         -0.8f, -0.8f, 0.0f,
+        1.0f, 0.0f, 0.0f, // color
         0.8f, -0.8f, 0.0f,
-        0.0f, 0.8f, 0.0f
+        0.0f, 1.0f, 0.0f, // color
+        0.0f, 0.8f, 0.0f,
+        0.0f, 0.0f, 1.0f  // color 
     };
 
-    std::vector<GLfloat> vertexColors {
-        1.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 1.0f
-    };
 
     // we start setting things up
     // on the GPU
@@ -76,34 +73,29 @@ void vertexSpecification() {
     glGenBuffers(1, &gVertexBufferObject);
     glBindBuffer(GL_ARRAY_BUFFER, gVertexBufferObject);
     glBufferData(GL_ARRAY_BUFFER,
-                vertexPosition.size() * sizeof(GLfloat),
-                vertexPosition.data(),
+                vertexData.size() * sizeof(GLfloat),
+                vertexData.data(),
                 GL_STATIC_DRAW);
 
+
+    // Linking the attrib in VAO
+    // POSITION
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0,
+    glVertexAttribPointer(0, 
                           3,
                           GL_FLOAT,
                           GL_FALSE,
-                          0,
+                          sizeof(GL_FLOAT) * 6, // IMPORTANT DEFN
                           (void*)0);
 
-
-    glGenBuffers(1, &gVertexBufferObject2);
-    glBindBuffer(GL_ARRAY_BUFFER, gVertexBufferObject2);
-    glBufferData(GL_ARRAY_BUFFER,
-                 vertexColors.size() * sizeof(GLfloat),
-                 vertexColors.data(),
-                 GL_STATIC_DRAW);
-
-    // Linking the attrib in VAO
+    // COLOR
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1,
                           3,
                           GL_FLOAT,
                           GL_FALSE,
-                          0,
-                          (void*)0);
+                          sizeof(GL_FLOAT) * 6,
+                          (GLvoid*)(sizeof(GL_FLOAT) * 3));
 
     glBindVertexArray(0);
     glDisableVertexAttribArray(0); 
