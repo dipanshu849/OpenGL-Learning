@@ -1,10 +1,21 @@
-#include "glad/glad.h"
+/*
+    g++ src/*.cpp glad/glad.c -o prog -I./glad/ -lGL -lglfw -ldl
+*/
+
+// Third Party Libraries
+#include "../glad/glad.h"
 #include <GLFW/glfw3.h>
+#include "../glm/ext/matrix_transform.hpp"
+#include "../glm/ext/matrix_clip_space.hpp"
+
+// Standard Libraries 
 #include <iostream>
 #include <vector>
 #include <string>
 #include <fstream>
 
+// My libraries
+#include "camera.hpp"
 
 int gScreenWidth = 800;
 int gScreenHeight = 600;
@@ -17,6 +28,14 @@ GLuint gVertexBufferObject = 0;
 
 // Program object (for our shader)
 GLuint gGraphicsPipelineShaderProgram = 0;
+
+// Offset to move the triangle
+GLfloat g_offset = 0;
+GLfloat g_rotate = 0;
+Camera g_camera(gScreenWidth, gScreenHeight);
+GLfloat g_cameraSpeed = 5.0f;
+GLfloat g_deltaTime = 0;
+GLfloat g_lastFrame = glfwGetTime();
 
 std::string loadShaderAsString(const std::string& filename) {
     std::string result = "";
@@ -34,7 +53,36 @@ std::string loadShaderAsString(const std::string& filename) {
     return result;
 }
 
-void initialization() {
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) 
+{
+  float cameraSpeed = g_cameraSpeed * g_deltaTime;
+  if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
+  {
+    g_camera.moveForward(cameraSpeed);
+  } 
+  else if(key == GLFW_KEY_DOWN && (action == GLFW_REPEAT || action == GLFW_PRESS))
+  {
+    g_camera.moveBackward(cameraSpeed);
+  }
+  else if(key == GLFW_KEY_LEFT && (action == GLFW_REPEAT || action == GLFW_PRESS)) 
+  {
+    g_rotate -= 1.0f;
+  }
+  else if(key == GLFW_KEY_RIGHT && (action == GLFW_REPEAT || action == GLFW_PRESS))
+  {
+    g_rotate += 1.0f;
+  }
+}
+
+
+void cursorPosition_callback(GLFWwindow* window, double xPos, double yPos)
+{
+  g_camera.mouseLook(xPos, yPos);
+}
+
+
+void initialization() 
+{
     if (!glfwInit()) return;
     window = glfwCreateWindow(800, 600, "Title", NULL, NULL);
     if (!window)
@@ -49,10 +97,15 @@ void initialization() {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return;
     }
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetKeyCallback(window, key_callback); 
+    glfwSetCursorPosCallback(window, cursorPosition_callback);
 }
 
 
-void vertexSpecification() {
+void vertexSpecification() 
+{
     // Lives on the CPU
     std::vector<GLfloat> vertexData {
         -0.8f, -0.8f, 0.0f,
@@ -102,7 +155,8 @@ void vertexSpecification() {
     glDisableVertexAttribArray(1);
 }
 
-GLuint CompileShader(GLuint type, const std::string& source) {
+GLuint CompileShader(GLuint type, const std::string& source) 
+{
     GLuint shaderObject;
 
     if (type == GL_VERTEX_SHADER) {
@@ -118,7 +172,8 @@ GLuint CompileShader(GLuint type, const std::string& source) {
     return shaderObject;
 }
 
-GLuint createShaderProgram(const std::string& vertexShaderSource, const std::string& fragmentShaderSource) {
+GLuint createShaderProgram(const std::string& vertexShaderSource, const std::string& fragmentShaderSource) 
+{
     GLuint programObject = glCreateProgram();
 
     GLuint myVertexShader   = CompileShader(GL_VERTEX_SHADER, vertexShaderSource);
@@ -134,63 +189,99 @@ GLuint createShaderProgram(const std::string& vertexShaderSource, const std::str
     return programObject;
 }
 
-void createGraphicsPipeline() {
+void createGraphicsPipeline() 
+{
     std::string vertexShaderSource = loadShaderAsString("./shaders/vert.glsl");
     std::string fragmentShaderSource = loadShaderAsString("./shaders/frag.glsl");
 
     gGraphicsPipelineShaderProgram = createShaderProgram(vertexShaderSource, fragmentShaderSource);
 }
 
-void PreDraw() {
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
 
-    glViewport(0, 0, gScreenWidth, gScreenHeight);
-    glClearColor(1.f, 0.f, 0.f, 1.f);
-    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT );
-
-    glUseProgram(gGraphicsPipelineShaderProgram);
-}
-
-void Draw() {
-
-    glBindVertexArray(gVertexArrayObject);
-    glBindBuffer(GL_ARRAY_BUFFER, gVertexBufferObject);
-
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+void Input()
+{
+  if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    glfwSetWindowShouldClose(window, true);
 }
 
 
-void mainLoop() {
-    while (!glfwWindowShouldClose(window))
-    {
-        // Handle Input
-        glfwPollEvents(); 
+void PreDraw() 
+{
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
 
-        PreDraw();
+  glViewport(0, 0, gScreenWidth, gScreenHeight);
+  glClearColor(1.f, 0.f, 0.f, 1.f);
+  glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT );
 
-        Draw();
+  glUseProgram(gGraphicsPipelineShaderProgram);
 
-        // Update the screen
-        glfwSwapBuffers(window);
-    }
+
+  // Local to world
+  GLint location = glGetUniformLocation(gGraphicsPipelineShaderProgram, "u_model");
+  glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, g_offset));
+  model = glm::rotate(model, glm::radians(g_rotate), glm::vec3(0.0f, 1.0f, 0.0f));
+  glUniformMatrix4fv(location, 1, GL_FALSE, &model[0][0]);
+
+
+  // World to camera
+  glm::mat4 cameraSpace = g_camera.getViewMatrix(); 
+  location = glGetUniformLocation(gGraphicsPipelineShaderProgram, "u_view");
+  glUniformMatrix4fv(location, 1, GL_FALSE, &cameraSpace[0][0]);    
+
+  // Real screen view
+  location    = glGetUniformLocation(gGraphicsPipelineShaderProgram, "u_projection");
+  glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)gScreenWidth/gScreenHeight, 0.1f, 10.0f);
+  glUniformMatrix4fv(location, 1, GL_FALSE, &projection[0][0]);
 }
 
-void cleanUp() {
-    glfwTerminate();
-    return;
+
+void Draw() 
+{
+  glBindVertexArray(gVertexArrayObject);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
+
+void mainLoop() 
+{
+  while (!glfwWindowShouldClose(window))
+  {
+    float currentTime = glfwGetTime();
+    g_deltaTime = currentTime - g_lastFrame;
+    g_lastFrame = currentTime;
+  
+    Input();
+
+    PreDraw();
+
+    Draw();
+
+    // Update the screen
+    glfwPollEvents(); 
+    glfwSwapBuffers(window);
+  }
+}
+
+
+void cleanUp() 
+{
+  glfwTerminate();
+  return;
 }
 
 
 int main()
 {
-    initialization();
+  initialization();
 
-    vertexSpecification();
+  vertexSpecification();
 
-    createGraphicsPipeline();
+  createGraphicsPipeline();
 
-    mainLoop();
+  mainLoop();
 
-    cleanUp();
+  cleanUp();
+
+  return 0;
 }
