@@ -20,6 +20,8 @@ class Camera
     void moveBackward(float);
     void moveLeft(float);
     void moveRight(float);
+    void moveUp(float);
+    void moveDown(float);
     void mouseLook(float, float);
 };
 #endif

@@ -44,12 +44,24 @@ void Camera::moveBackward(float speed)
 
 void Camera::moveLeft(float speed)
 {
-
+  glm::vec3 right = glm::normalize(glm::cross(m_upDirection, m_targetPosition));
+  m_eye += speed * right;
 }
 
 void Camera::moveRight(float speed)
 {
+  glm::vec3 right = glm::normalize(glm::cross(m_upDirection, m_targetPosition));
+  m_eye -= speed * right;
+}
 
+void Camera::moveUp(float speed)
+{
+  m_eye += speed * m_upDirection;  
+}
+
+void Camera::moveDown(float speed)
+{
+  m_eye -= speed * m_upDirection;
 }
 
 void Camera::mouseLook(float xPos, float yPos)

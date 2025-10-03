@@ -55,22 +55,36 @@ std::string loadShaderAsString(const std::string& filename) {
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) 
 {
+  // 
+  if(action != GLFW_REPEAT && action != GLFW_PRESS) return; 
+  
   float cameraSpeed = g_cameraSpeed * g_deltaTime;
-  if (key == GLFW_KEY_UP && (action == GLFW_REPEAT || action == GLFW_PRESS))
+
+  switch (key)
   {
-    g_camera.moveForward(cameraSpeed);
-  } 
-  else if(key == GLFW_KEY_DOWN && (action == GLFW_REPEAT || action == GLFW_PRESS))
-  {
-    g_camera.moveBackward(cameraSpeed);
-  }
-  else if(key == GLFW_KEY_LEFT && (action == GLFW_REPEAT || action == GLFW_PRESS)) 
-  {
-    g_rotate -= 1.0f;
-  }
-  else if(key == GLFW_KEY_RIGHT && (action == GLFW_REPEAT || action == GLFW_PRESS))
-  {
-    g_rotate += 1.0f;
+    case GLFW_KEY_W:
+      g_camera.moveForward(cameraSpeed);
+      break;
+  
+    case GLFW_KEY_S:
+      g_camera.moveBackward(cameraSpeed);
+      break;
+
+    case GLFW_KEY_D:
+      g_camera.moveRight(cameraSpeed);
+      break;
+
+    case GLFW_KEY_A:
+      g_camera.moveLeft(cameraSpeed);
+      break;
+
+    case GLFW_KEY_UP:
+      g_camera.moveUp(cameraSpeed);
+      break;
+
+    case GLFW_KEY_DOWN:
+      g_camera.moveDown(cameraSpeed);
+      break;
   }
 }
 
