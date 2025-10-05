@@ -2,26 +2,27 @@
 #include "../glm/ext/matrix_transform.hpp"
 #include <iostream>
 #include <cmath>
+
+// NOTE:
 /*
   Due to work done by GLM, I can just care about how my camera is moiving in space,
   Instead of thinking about the reality that the world is moving around camera and inverse transformations are being applied
 */
+/*
+  m_targetPosition acts like the inital looking postion for out camera
+  But, when we are moving the camera the would be m_eye + m_targetPosition
+*/
 
-Camera::Camera(int width, int height)
+Camera::Camera()
 {
   m_eye            = glm::vec3(0.0f, 0.0f, 0.0f);
-  // NOTE:
-  /*
-    m_targetPosition acts like the inital looking postion for out camera
-    But, when we are moving the camera the would be m_eye + m_targetPosition
-  */
   m_targetPosition = glm::vec3(0.0f, 0.0f, -1.0f);
   m_upDirection    = glm::vec3(0.0f, 1.0f, 0.0f); 
 
   yaw = -90.0f;
   pitch = 0.0f;
-  m_lastMousePosition.x = width / 2;
-  m_lastMousePosition.y = height / 2;
+  m_lastMousePosition.x = 0;
+  m_lastMousePosition.y = 0;
 }
 
 glm::mat4 Camera::getViewMatrix()

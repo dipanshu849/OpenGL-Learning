@@ -16,95 +16,100 @@
 
 // My libraries
 #include "camera.hpp"
+#include "loadModel.hpp"
 
-int gScreenWidth = 800;
-int gScreenHeight = 600;
-GLFWwindow * window = nullptr;
+struct App
+{
+  int mScreenWidth = 800;
+  int mScreenHeight = 600;
+  
+  const char* mTitle = "CL-3";
 
-// VAO
-GLuint gVertexArrayObject = 0;
-// VBO
-GLuint gVertexBufferObject = 0;
+  GLFWwindow * mWindow = nullptr;
+  GLuint mGraphicsPipelineShaderProgram = 0;
 
-// Program object (for our shader)
-GLuint gGraphicsPipelineShaderProgram = 0;
+  Camera mCamera;
+  GLfloat mCameraSpeed = 5.0f;
 
-// Offset to move the triangle
-GLfloat g_offset = 0;
-GLfloat g_rotate = 0;
-Camera g_camera(gScreenWidth, gScreenHeight);
-GLfloat g_cameraSpeed = 5.0f;
-GLfloat g_deltaTime = 0;
-GLfloat g_lastFrame = glfwGetTime();
+  GLfloat mDeltaTime = 0;
+  GLfloat mLastFrame = glfwGetTime();
+};
 
-std::string loadShaderAsString(const std::string& filename) {
-    std::string result = "";
 
-    std::string line = "";
-    std::ifstream myFile(filename.c_str());
+template <typename T>
+struct Mesh3D
+{
+  GLuint mVertexArrayObject = 0;
+  GLuint mVertexBufferObject = 0;  
+  
+  // we can use glfoat or glm::vec3 direct
+  std::vector<T> mVertexData;
 
-    if (myFile.is_open()) {
-        while (std::getline(myFile, line)) {
-            result += line + '\n';
-        }
-        myFile.close();
-    }
+  GLfloat mOffset = 0;
+  GLfloat mRotate = 0;
+};
 
-    return result;
-}
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GLOBALS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+App gApp;
+Mesh3D<glm::vec3> gMesh1;
+Mesh3D<GLfloat> gMesh2;
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GLOBALS END ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
+// Handle Keyboard inputs
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) 
 {
-  // 
   if(action != GLFW_REPEAT && action != GLFW_PRESS) return; 
   
-  float cameraSpeed = g_cameraSpeed * g_deltaTime;
+  float cameraSpeed = gApp.mCameraSpeed * gApp.mDeltaTime;
 
   switch (key)
   {
     case GLFW_KEY_W:
-      g_camera.moveForward(cameraSpeed);
+      gApp.mCamera.moveForward(cameraSpeed);
       break;
   
     case GLFW_KEY_S:
-      g_camera.moveBackward(cameraSpeed);
+      gApp.mCamera.moveBackward(cameraSpeed);
       break;
 
     case GLFW_KEY_D:
-      g_camera.moveRight(cameraSpeed);
+      gApp.mCamera.moveRight(cameraSpeed);
       break;
 
     case GLFW_KEY_A:
-      g_camera.moveLeft(cameraSpeed);
+      gApp.mCamera.moveLeft(cameraSpeed);
       break;
 
     case GLFW_KEY_UP:
-      g_camera.moveUp(cameraSpeed);
+      gApp.mCamera.moveUp(cameraSpeed);
       break;
 
     case GLFW_KEY_DOWN:
-      g_camera.moveDown(cameraSpeed);
+      gApp.mCamera.moveDown(cameraSpeed);
       break;
   }
 }
 
 
+// Handle mouse inputs
 void cursorPosition_callback(GLFWwindow* window, double xPos, double yPos)
 {
-  g_camera.mouseLook(xPos, yPos);
+  gApp.mCamera.mouseLook(xPos, yPos);
 }
 
 
-void initialization() 
-{
+// Get things ready
+void initialization(App* app) 
+{ 
     if (!glfwInit()) return;
-    window = glfwCreateWindow(800, 600, "Title", NULL, NULL);
-    if (!window)
+    app->mWindow = glfwCreateWindow(app->mScreenWidth, app->mScreenHeight, app->mTitle, NULL, NULL);
+    if (!app->mWindow)
     {
         glfwTerminate();
         return;
     }
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(app->mWindow);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -112,36 +117,53 @@ void initialization()
         return;
     }
 
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetKeyCallback(window, key_callback); 
-    glfwSetCursorPosCallback(window, cursorPosition_callback);
+    glfwSetKeyCallback(app->mWindow, key_callback); 
+    glfwSetInputMode(app->mWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(app->mWindow, cursorPosition_callback);
 }
 
 
-void vertexSpecification() 
+bool meshCreate()
 {
-    // Lives on the CPU
-    std::vector<GLfloat> vertexData {
-        -0.8f, -0.8f, 0.0f,
-        1.0f, 0.0f, 0.0f, // color
-        0.8f, -0.8f, 0.0f,
-        0.0f, 1.0f, 0.0f, // color
-        0.0f, 0.8f, 0.0f,
-        0.0f, 0.0f, 1.0f  // color 
-    };
+
+  // Lives on the CPU
+  //std::vector<GLfloat> vertexData {
+  //    -0.8f, -0.8f, 0.0f,
+  //    1.0f, 0.0f, 0.0f, // color
+  //    0.8f, -0.8f, 0.0f,
+  //    0.0f, 1.0f, 0.0f, // color
+  //    0.0f, 0.8f, 0.0f,
+  //    0.0f, 0.0f, 1.0f  // color 
+  // };
+  std::vector<float> vertexData;
+  std::vector<glm::vec2> uvData;
+  std::vector<glm::vec3> normalData;
+
+  if(loadObj("Models/Bench.obj", vertexData, uvData, normalData) == false)
+  {
+    return false;
+  }
+
+  gMesh2.mVertexData = vertexData;
+  return true;
+}
 
 
+// Sets up mesh data from CPU to GPU 
+template <typename T>
+void meshCTGdataTransfer(Mesh3D<T>* mesh) 
+{
     // we start setting things up
     // on the GPU
-    glGenVertexArrays(1, &gVertexArrayObject);
-    glBindVertexArray(gVertexArrayObject);
+    glGenVertexArrays(1, &mesh->mVertexArrayObject);
+    glBindVertexArray(mesh->mVertexArrayObject);
 
     // start generating our VBO
-    glGenBuffers(1, &gVertexBufferObject);
-    glBindBuffer(GL_ARRAY_BUFFER, gVertexBufferObject);
+    glGenBuffers(1, &mesh->mVertexBufferObject);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh->mVertexBufferObject);
     glBufferData(GL_ARRAY_BUFFER,
-                vertexData.size() * sizeof(GLfloat),
-                vertexData.data(),
+                mesh->mVertexData.size() * sizeof(T),
+                mesh->mVertexData.data(),
                 GL_STATIC_DRAW);
 
 
@@ -151,24 +173,16 @@ void vertexSpecification()
     glVertexAttribPointer(0, 
                           3,
                           GL_FLOAT,
-                          GL_FALSE,
-                          sizeof(GL_FLOAT) * 6, // IMPORTANT DEFN
+                          false,
+                          0, 
                           (void*)0);
-
-    // COLOR
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1,
-                          3,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          sizeof(GL_FLOAT) * 6,
-                          (GLvoid*)(sizeof(GL_FLOAT) * 3));
 
     glBindVertexArray(0);
     glDisableVertexAttribArray(0); 
-    glDisableVertexAttribArray(1);
 }
 
+
+// ~~~~~~~~~~~~~~~~~~ Graphics Pipline Setup ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GLuint CompileShader(GLuint type, const std::string& source) 
 {
     GLuint shaderObject;
@@ -203,77 +217,100 @@ GLuint createShaderProgram(const std::string& vertexShaderSource, const std::str
     return programObject;
 }
 
-void createGraphicsPipeline() 
+
+// Converts GLSL files to strings
+std::string loadShaderAsString(const std::string& filename) {
+    std::string result = "";
+
+    std::string line = "";
+    std::ifstream myFile(filename.c_str());
+
+    if (myFile.is_open()) {
+        while (std::getline(myFile, line)) {
+            result += line + '\n';
+        }
+        myFile.close();
+    }
+
+    return result;
+}
+
+
+void createGraphicsPipeline(App* app) 
 {
     std::string vertexShaderSource = loadShaderAsString("./shaders/vert.glsl");
     std::string fragmentShaderSource = loadShaderAsString("./shaders/frag.glsl");
 
-    gGraphicsPipelineShaderProgram = createShaderProgram(vertexShaderSource, fragmentShaderSource);
+    app->mGraphicsPipelineShaderProgram = createShaderProgram(vertexShaderSource, fragmentShaderSource);
 }
+// ~~~~~~~~~~~~~~~~~~ Graphics Pipline Setup END ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-void Input()
+void Input(App* app)
 {
-  if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    glfwSetWindowShouldClose(window, true);
+  if(glfwGetKey(app->mWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    glfwSetWindowShouldClose(app->mWindow, true);
 }
 
 
-void PreDraw() 
+template <typename T>
+void PreDraw(App* app, Mesh3D<T>* mesh) 
 {
   glDisable(GL_DEPTH_TEST);
   glDisable(GL_CULL_FACE);
 
-  glViewport(0, 0, gScreenWidth, gScreenHeight);
+  glViewport(0, 0, app->mScreenWidth, app->mScreenHeight);
   glClearColor(1.f, 0.f, 0.f, 1.f);
   glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT );
 
-  glUseProgram(gGraphicsPipelineShaderProgram);
+  glUseProgram(app->mGraphicsPipelineShaderProgram);
 
 
   // Local to world
-  GLint location = glGetUniformLocation(gGraphicsPipelineShaderProgram, "u_model");
-  glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, g_offset));
-  model = glm::rotate(model, glm::radians(g_rotate), glm::vec3(0.0f, 1.0f, 0.0f));
+  GLint location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_model");
+  glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, mesh->mOffset));
+  model = glm::rotate(model, glm::radians(mesh->mRotate), glm::vec3(0.0f, 1.0f, 0.0f));
+  model = glm::scale(model, glm::vec3(0.05f, 0.05f, 0.05f));
   glUniformMatrix4fv(location, 1, GL_FALSE, &model[0][0]);
 
 
   // World to camera
-  glm::mat4 cameraSpace = g_camera.getViewMatrix(); 
-  location = glGetUniformLocation(gGraphicsPipelineShaderProgram, "u_view");
+  glm::mat4 cameraSpace = app->mCamera.getViewMatrix(); 
+  location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_view");
   glUniformMatrix4fv(location, 1, GL_FALSE, &cameraSpace[0][0]);    
 
   // Real screen view
-  location    = glGetUniformLocation(gGraphicsPipelineShaderProgram, "u_projection");
-  glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)gScreenWidth/gScreenHeight, 0.1f, 10.0f);
+  location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_projection");
+  glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)app->mScreenWidth/app->mScreenHeight, 0.1f, 10.0f);
   glUniformMatrix4fv(location, 1, GL_FALSE, &projection[0][0]);
 }
 
 
-void Draw() 
+template <typename T>
+void Draw(Mesh3D<T>* mesh) 
 {
-  glBindVertexArray(gVertexArrayObject);
-  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glBindVertexArray(mesh->mVertexArrayObject);
+  glDrawArrays(GL_TRIANGLES, 0, mesh->mVertexData.size());
 }
 
 
-void mainLoop() 
+template <typename T>
+void mainLoop(App* app, Mesh3D<T>* mesh) 
 {
-  while (!glfwWindowShouldClose(window))
+  while (!glfwWindowShouldClose(app->mWindow))
   {
     float currentTime = glfwGetTime();
-    g_deltaTime = currentTime - g_lastFrame;
-    g_lastFrame = currentTime;
+    app->mDeltaTime = currentTime - app->mLastFrame;
+    app->mLastFrame = currentTime;
   
-    Input();
+    Input(app);
 
-    PreDraw();
+    PreDraw(app, mesh);
 
-    Draw();
+    Draw(mesh);
 
     // Update the screen
     glfwPollEvents(); 
-    glfwSwapBuffers(window);
+    glfwSwapBuffers(app->mWindow);
   }
 }
 
@@ -287,14 +324,18 @@ void cleanUp()
 
 int main()
 {
-  initialization();
+  initialization(&gApp);
 
-  vertexSpecification();
+  if(!meshCreate())
+  {
+    cleanUp();
+    return 0;
+  };
 
-  createGraphicsPipeline();
+  meshCTGdataTransfer(&gMesh2);
+  createGraphicsPipeline(&gApp);
 
-  mainLoop();
-
+  mainLoop(&gApp, &gMesh2);
   cleanUp();
 
   return 0;

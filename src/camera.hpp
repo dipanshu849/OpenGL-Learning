@@ -14,7 +14,7 @@ class Camera
     float pitch;
 
   public:
-    Camera(int, int);
+    Camera();
     glm::mat4 getViewMatrix();
     void moveForward(float);
     void moveBackward(float);
