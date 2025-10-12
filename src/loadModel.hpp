@@ -4,5 +4,5 @@
 
 bool loadObj(const char* path,
              std::vector<float> &outVertices,
-             std::vector<glm::vec2> &outUvs,
-             std::vector<glm::vec3> &outNormals);
+             std::vector<float> &outUvs,
+             std::vector<float> &outNormals);

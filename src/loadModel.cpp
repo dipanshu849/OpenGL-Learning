@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <vector>
 #include <cstring>
+#include <iostream>
 
 #include "../glm/ext/vector_float2.hpp"
 #include "../glm/ext/vector_float3.hpp"
@@ -8,8 +9,8 @@
 
 bool loadObj(const char* path,
             std::vector<float> &outVertices,
-            std::vector<glm::vec2> &outUvs,
-            std::vector<glm::vec3> &outNormals)
+            std::vector<float> &outUvs,
+            std::vector<float> &outNormals)
 {
   FILE* fp = fopen(path, "r");
   if (fp == NULL)
@@ -91,15 +92,23 @@ bool loadObj(const char* path,
   {
     unsigned int index = uvIndices[i];
     glm::vec2 uv = temp_uvs[index - 1];
-    outUvs.push_back(uv);
+    outUvs.push_back(uv.x);
+    outUvs.push_back(uv.y);
   }
 
   for (unsigned int i = 0; i < normalIndices.size(); i++)
   {
     unsigned int index = normalIndices[i];
     glm::vec3 normal = temp_normals[index - 1];
-    outNormals.push_back(normal);
+   
+    outNormals.push_back(normal.x);
+    outNormals.push_back(normal.y);
+    outNormals.push_back(normal.z);
   }
+    
+  std::cout << "In load model file" << std::endl;
+  std::cout << "Size of vertexIndex: " << vertexIndices.size() << std::endl;
+  std::cout << "Size of uvIndex: " << uvIndices.size() << std::endl;
 
   return true;
 }
