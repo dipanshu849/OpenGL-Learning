@@ -106,9 +106,9 @@ bool loadObj(const char* path,
     outNormals.push_back(normal.z);
   }
     
-  std::cout << "In load model file" << std::endl;
-  std::cout << "Size of vertexIndex: " << vertexIndices.size() << std::endl;
-  std::cout << "Size of uvIndex: " << uvIndices.size() << std::endl;
+  // std::cout << "In load model file" << std::endl;
+  // std::cout << "Size of vertexIndex: " << vertexIndices.size() << std::endl;
+  // std::cout << "Size of uvIndex: " << uvIndices.size() << std::endl;
 
   return true;
 }

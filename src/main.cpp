@@ -1,4 +1,3 @@
-    // color = vec4(0.0f, 0.0f, 1.0f, 1.0f);
 /*
     g++ src/*.cpp glad/glad.c -o prog -I./glad/ -lGL -lglfw -ldl
 */
@@ -8,6 +7,8 @@
 #include <GLFW/glfw3.h>
 #include "../glm/ext/matrix_transform.hpp"
 #include "../glm/ext/matrix_clip_space.hpp"
+#define GLM_ENABLE_EXPERIMENTAL
+#include "../glm/gtx/string_cast.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -16,6 +17,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <cstring>
 
 // My libraries
 #include "camera.hpp"
@@ -32,7 +34,7 @@ struct App
   GLuint mGraphicsPipelineShaderProgram = 0;
 
   Camera mCamera;
-  GLfloat mCameraSpeed = 5.0f;
+  GLfloat mCameraSpeed = 10.0f;
 
   GLfloat mDeltaTime = 0;
   GLfloat mLastFrame = glfwGetTime();
@@ -50,15 +52,20 @@ struct Mesh3D
   // we can use glfoat or glm::vec3 direct
   std::vector<T> mVertexData; 
   std::vector<T> mUvData; // T can cause problem here
+  std::vector<T> mNormalData;
 
-  GLfloat mOffset = 0;
-  GLfloat mRotate = 0;
+  glm::vec3 mOffset = glm::vec3(0.0f);
+  GLfloat mRotate = 0.0f;
+  glm::vec3 mScale = glm::vec3(0.0f);
+
+  const char* name = "";
+  const char* mModelPath = "";
+  const char* mTexturePath = "";
 };
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GLOBALS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 App gApp;
-// Mesh3D<glm::vec3> gMesh1;
-Mesh3D<GLfloat> gMesh2;
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GLOBALS END ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -130,7 +137,7 @@ void cursorPosition_callback(GLFWwindow* window, double xPos, double yPos)
 }
 
 
-// Get things ready
+// Getting things ready
 void initialization(App* app) 
 { 
     if (!glfwInit()) return;
@@ -155,6 +162,7 @@ void initialization(App* app)
 }
 
 
+// Load object
 template <typename T>
 bool meshCreate(const char* path, Mesh3D<T> *mesh)
 {
@@ -170,10 +178,12 @@ bool meshCreate(const char* path, Mesh3D<T> *mesh)
 
   mesh->mVertexData = vertexData;
   mesh->mUvData = uvData;
+  mesh->mNormalData = normalData;
   return true;
 }
 
 
+// Load texture
 template <typename T>
 bool loadTexture(const char* path, Mesh3D<T> *mesh)
 {
@@ -197,8 +207,8 @@ bool loadTexture(const char* path, Mesh3D<T> *mesh)
   
   if (data)
   {
-    std::cout << "Width of texture: " << width << std::endl;
-    std::cout << "Height of texture: " << height << std::endl;
+     // std::cout << "Width of texture: " << width << std::endl;
+     // std::cout << "Height of texture: " << height << std::endl;
 
     GLCheck(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);)
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -216,16 +226,14 @@ bool loadTexture(const char* path, Mesh3D<T> *mesh)
 }
 
 
-// Sets up mesh data from CPU to GPU 
+// Sets up mesh data transfer from CPU to GPU 
 template <typename T>
 void meshCTGdataTransfer(Mesh3D<T>* mesh) 
 {
-  // we start setting things up
-  // on the GPU
   glGenVertexArrays(1, &mesh->mVertexArrayObject);
   glBindVertexArray(mesh->mVertexArrayObject);
 
-  // start generating our VBO
+  // 1. start generating our position VBO
   glGenBuffers(1, &mesh->mPositionVertexBufferObject);
   glBindBuffer(GL_ARRAY_BUFFER, mesh->mPositionVertexBufferObject);
   glBufferData(GL_ARRAY_BUFFER,
@@ -234,8 +242,7 @@ void meshCTGdataTransfer(Mesh3D<T>* mesh)
               GL_STATIC_DRAW);
 
 
-  // Linking the attrib in VAO
-  // POSITION
+  //    Linking the position attrib in VAO
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 
                         3,
@@ -244,6 +251,7 @@ void meshCTGdataTransfer(Mesh3D<T>* mesh)
                         0, 
                         (void*)0);
 
+  // 2. start generating our uv VBO
   glGenBuffers(1, &mesh->mUvVertexBufferObject);
   glBindBuffer(GL_ARRAY_BUFFER, mesh->mUvVertexBufferObject);
   glBufferData(GL_ARRAY_BUFFER,
@@ -251,7 +259,7 @@ void meshCTGdataTransfer(Mesh3D<T>* mesh)
               mesh->mUvData.data(),
               GL_STATIC_DRAW);
 
-
+  //    Linking the uv attrib in VAO
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1,
                         2,
@@ -329,6 +337,7 @@ void createGraphicsPipeline(App* app)
 }
 // ~~~~~~~~~~~~~~~~~~ Graphics Pipline Setup END ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
 void Input(App* app)
 {
   if(glfwGetKey(app->mWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -336,8 +345,7 @@ void Input(App* app)
 }
 
 
-template <typename T>
-void PreDraw(App* app, Mesh3D<T>* mesh) 
+void PreDraw(App* app) 
 {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_CULL_FACE);
@@ -347,24 +355,29 @@ void PreDraw(App* app, Mesh3D<T>* mesh)
   glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT );
 
   glUseProgram(app->mGraphicsPipelineShaderProgram);
+}
 
 
+template <typename T>
+void MeshTransformation(App* app, Mesh3D<T>* mesh)
+{
   // Local to world
   GLint location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_model");
-  glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, mesh->mOffset));
+  glm::mat4 model = glm::translate(glm::mat4(1.0f), mesh->mOffset);
   model = glm::rotate(model, glm::radians(mesh->mRotate), glm::vec3(0.0f, 1.0f, 0.0f));
-  model = glm::scale(model, glm::vec3(0.05f, 0.05f, 0.05f));
+  model = glm::scale(model, mesh->mScale);
   glUniformMatrix4fv(location, 1, GL_FALSE, &model[0][0]);
 
 
   // World to camera
-  glm::mat4 cameraSpace = app->mCamera.getViewMatrix(); 
   location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_view");
+  glm::mat4 cameraSpace = app->mCamera.getViewMatrix(); 
   glUniformMatrix4fv(location, 1, GL_FALSE, &cameraSpace[0][0]);    
+
 
   // Real screen view
   location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_projection");
-  glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)app->mScreenWidth/app->mScreenHeight, 0.1f, 10.0f);
+  glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)app->mScreenWidth/app->mScreenHeight, 0.1f, 100.0f);
   glUniformMatrix4fv(location, 1, GL_FALSE, &projection[0][0]);
 }
 
@@ -380,7 +393,7 @@ void Draw(Mesh3D<T>* mesh)
 
 
 template <typename T>
-void mainLoop(App* app, Mesh3D<T>* mesh) 
+void mainLoop(App* app, std::vector<Mesh3D<T>> meshes) 
 {
   while (!glfwWindowShouldClose(app->mWindow))
   {
@@ -389,10 +402,13 @@ void mainLoop(App* app, Mesh3D<T>* mesh)
     app->mLastFrame = currentTime;
   
     Input(app);
+    PreDraw(app);
 
-    PreDraw(app, mesh);
-
-    Draw(mesh);
+    for (Mesh3D<T> mesh : meshes)
+    {
+      MeshTransformation(app, &mesh);
+      Draw(&mesh);
+    }
 
     // Update the screen
     glfwPollEvents(); 
@@ -410,20 +426,75 @@ void cleanUp()
 
 int main()
 {
-  initialization(&gApp);
+  // ~~~~~~~~~~~~~~~~~~~~~ Objects ~~~~~~~~~~~~~~~~~~~~~~~
+  Mesh3D<GLfloat> bench;
+  Mesh3D<GLfloat> podium;
 
-  if(
-     !meshCreate("Models/BenchTextured.obj", &gMesh2) || 
-     !loadTexture("Models/textures/combinedBenchTexture.png", &gMesh2))
-  {
-    cleanUp();
-    return 0;
+  bench.name = "Bench";
+  bench.mScale = glm::vec3(0.07f, 0.057f, 0.05f);
+  bench.mModelPath = "Models/BenchTextured.obj";
+  bench.mTexturePath = "Models/textures/combinedBenchTexture.png";
+
+  podium.name = "Podium";
+  podium.mScale = glm::vec3(0.14f, 0.14f, 0.11f);
+  podium.mOffset = glm::vec3(-1.2f, 0.95f, 0.9f);
+  podium.mModelPath = "Models/podium.obj";
+
+  std::vector<Mesh3D<GLfloat>> meshes = {
+    bench,
+    podium
   };
-  meshCTGdataTransfer(&gMesh2);
+  // ~~~~~~~~~~~~~~~~~~~~~ Objects end ~~~~~~~~~~~~~~~~~~~~~~~
 
+  initialization(&gApp);
   createGraphicsPipeline(&gApp);
 
-  mainLoop(&gApp, &gMesh2);
+  for (Mesh3D<GLfloat>& mesh : meshes) {
+    if(!meshCreate(mesh.mModelPath, &mesh))
+    {
+      std::cout << "Failed to load model for " << mesh.name << std::endl;
+      // cleanUp();
+      // return 0;
+    };
+
+    if(strcmp(mesh.mTexturePath, "") != 0)
+    {
+      if (!loadTexture(mesh.mTexturePath, &mesh))
+      {
+        std::cout << "Failed to load texture for " << mesh.name << std::endl;
+      }
+    } 
+    else std::cout << "No texture allocated for " << mesh.name << std::endl;
+
+    meshCTGdataTransfer(&mesh);
+  }
+  
+
+  // ~~~~~~~~~~~~~~~~~~~~~ Bench placement ~~~~~~~~~~~~~~~~~~~~~~~
+  Mesh3D<GLfloat> refBench = meshes[0];
+  meshes.erase(meshes.begin());
+
+  float distbwBenchRow = 1.28f;
+  float distbwBenchCol = 2.88f;
+
+  float refX = refBench.mOffset.x;
+  float refY = refBench.mOffset.y;
+  float refZ = refBench.mOffset.z;
+
+  for (int i = 0; i < 25; i++)
+  {
+    if (i == 0 || i == 5) continue; // exceptions !!
+    float newX = refX - (distbwBenchCol * (i / 5));
+    float newY = refY;
+    float newZ = refZ - (distbwBenchRow * (i % 5));
+    
+    refBench.mOffset = glm::vec3(newX, newY, newZ);
+    meshes.push_back(refBench);
+  }
+
+  // ~~~~~~~~~~~~~~~~~~~~~ Bench placement end~~~~~~~~~~~~~~~~~~~~~~~
+
+  mainLoop(&gApp, meshes);
   cleanUp();
 
   return 0;
