@@ -1,5 +1,14 @@
 /*
-    g++ src/*.cpp glad/glad.c -o prog -I./glad/ -lGL -lglfw -ldl
+  TO RUN:                 1.  g++ src/*.cpp glad/glad.c -o prog -I./glad/ -lGL -lglfw -ldl [from parent directory]
+                          2.  ./prog
+
+
+  TO NAVIGATE:            WASD           -> in XZ axis
+                          Top Down arrow -> Y axis
+                          Mouse
+
+
+  TO UNDERSTAND THE CODE: Start from main function [at very bottom]               
 */
 
 // Third Party Libraries
@@ -424,9 +433,9 @@ void cleanUp()
 }
 
 
-int main()
+
+void ObjectCreation(std::vector<Mesh3D<GLfloat>>& meshes)
 {
-  // ~~~~~~~~~~~~~~~~~~~~~ Objects ~~~~~~~~~~~~~~~~~~~~~~~
   Mesh3D<GLfloat> bench;
   Mesh3D<GLfloat> podium;
 
@@ -440,26 +449,22 @@ int main()
   podium.mOffset = glm::vec3(-1.2f, 0.95f, 0.9f);
   podium.mModelPath = "Models/podium.obj";
 
-  std::vector<Mesh3D<GLfloat>> meshes = {
-    bench,
-    podium
-  };
-  // ~~~~~~~~~~~~~~~~~~~~~ Objects end ~~~~~~~~~~~~~~~~~~~~~~~
+  meshes.push_back(bench);
+  meshes.push_back(podium);
+}
 
-  initialization(&gApp);
-  createGraphicsPipeline(&gApp);
 
+void ObjectFilling(std::vector<Mesh3D<GLfloat>>& meshes)
+{
   for (Mesh3D<GLfloat>& mesh : meshes) {
-    if(!meshCreate(mesh.mModelPath, &mesh))
+    if(!meshCreate(mesh.mModelPath, &mesh))       // Loading position, UV, normals for vertices
     {
       std::cout << "Failed to load model for " << mesh.name << std::endl;
-      // cleanUp();
-      // return 0;
     };
 
     if(strcmp(mesh.mTexturePath, "") != 0)
     {
-      if (!loadTexture(mesh.mTexturePath, &mesh))
+      if (!loadTexture(mesh.mTexturePath, &mesh)) // Loading texture for object [if avaliable] 
       {
         std::cout << "Failed to load texture for " << mesh.name << std::endl;
       }
@@ -468,9 +473,11 @@ int main()
 
     meshCTGdataTransfer(&mesh);
   }
-  
+}
 
-  // ~~~~~~~~~~~~~~~~~~~~~ Bench placement ~~~~~~~~~~~~~~~~~~~~~~~
+
+void BenchPlacement(std::vector<Mesh3D<GLfloat>>& meshes)
+{
   Mesh3D<GLfloat> refBench = meshes[0];
   meshes.erase(meshes.begin());
 
@@ -491,8 +498,19 @@ int main()
     refBench.mOffset = glm::vec3(newX, newY, newZ);
     meshes.push_back(refBench);
   }
+}
 
-  // ~~~~~~~~~~~~~~~~~~~~~ Bench placement end~~~~~~~~~~~~~~~~~~~~~~~
+
+int main()
+{
+  initialization(&gApp);
+  createGraphicsPipeline(&gApp);
+
+  std::vector<Mesh3D<GLfloat>> meshes;
+  ObjectCreation(meshes);
+  ObjectFilling(meshes);
+
+  BenchPlacement(meshes);
 
   mainLoop(&gApp, meshes);
   cleanUp();
