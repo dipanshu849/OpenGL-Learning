@@ -11,6 +11,7 @@
   TO UNDERSTAND THE CODE: Start from main function [at very bottom]               
 */
 
+
 // Third Party Libraries
 #include "../glad/glad.h"
 #include <GLFW/glfw3.h>
@@ -72,11 +73,25 @@ struct Mesh3D
   const char* mTexturePath = "";
 };
 
+
+struct Grid
+{
+  GLuint mVertexArrayObject = 0; 
+  GLuint mVertexBufferObjectH = 0;
+  GLuint mVertexBufferObjectV = 0;
+
+  std::vector<glm::vec3> mVertexDataH;
+  std::vector<glm::vec3> mVertexDataV;
+
+  int mROW = 10;
+  int mCOL = 15;
+  float mTileSize = 1.0f;
+};
+
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GLOBALS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 App gApp;
+Grid gGrid;
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GLOBALS END ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~ ERROR HANDLING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -149,8 +164,10 @@ void cursorPosition_callback(GLFWwindow* window, double xPos, double yPos)
 // Getting things ready
 void initialization(App* app) 
 { 
-    if (!glfwInit()) return;
-    app->mWindow = glfwCreateWindow(app->mScreenWidth, app->mScreenHeight, app->mTitle, NULL, NULL);
+  if (!glfwInit()) return;
+
+  app->mWindow = glfwCreateWindow(app->mScreenWidth, app->mScreenHeight, app->mTitle, NULL, NULL);
+
   if (!app->mWindow)
   {
       glfwTerminate();
@@ -168,6 +185,48 @@ void initialization(App* app)
   glfwSetInputMode(app->mWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   
   glfwSetCursorPosCallback(app->mWindow, cursorPosition_callback);
+}
+
+
+void initializeGrid()
+{
+  glm::vec3 refCoordinate = glm::vec3(0.0f, 0.0f, 0.0f);
+
+  for (int i = 0; i < gGrid.mROW; i++)
+  {
+    for (int j = 0; j < gGrid.mCOL; j++)
+    {
+       if (j == 0 || j == gGrid.mCOL - 1)
+       {
+         glm::vec3 tempCoordinate;
+         tempCoordinate.x = refCoordinate.x - (float)(j * gGrid.mTileSize);
+         tempCoordinate.y = refCoordinate.y;
+         tempCoordinate.z = refCoordinate.z - (float)(i * gGrid.mTileSize);
+         gGrid.mVertexDataH.push_back(tempCoordinate);
+       }
+    }
+  }
+
+
+  for (int j = 0; j < gGrid.mCOL; j++)
+  {
+    for (int i = 0; i < gGrid.mROW; i++)
+    {
+       if (i == 0 || i == gGrid.mROW - 1)
+       {
+         glm::vec3 tempCoordinate;
+         tempCoordinate.x = refCoordinate.x - (float)(j * gGrid.mTileSize);
+         tempCoordinate.y = refCoordinate.y;
+         tempCoordinate.z = refCoordinate.z - (float)(i * gGrid.mTileSize);
+         gGrid.mVertexDataV.push_back(tempCoordinate);
+       }
+    }
+  }
+
+  glGenVertexArrays(1, &gGrid.mVertexArrayObject);
+
+  glGenBuffers(1, &gGrid.mVertexBufferObjectH);
+  glGenBuffers(1, &gGrid.mVertexBufferObjectV);
 }
 
 
@@ -312,9 +371,7 @@ GLuint createShaderProgram(const std::string& vertexShaderSource, const std::str
     glAttachShader(programObject, myFragmentShader);
     glLinkProgram(programObject);
 
-    // Validate our program
     glValidateProgram(programObject);
-
     return programObject;
 }
 
@@ -345,8 +402,6 @@ void createGraphicsPipeline(App* app)
     app->mGraphicsPipelineShaderProgram = createShaderProgram(vertexShaderSource, fragmentShaderSource);
 }
 // ~~~~~~~~~~~~~~~~~~ Graphics Pipline Setup END ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 void Input(App* app)
 {
   if(glfwGetKey(app->mWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -367,6 +422,55 @@ void PreDraw(App* app)
 }
 
 
+void DisplayGrid(App* app)
+{
+  // Local to world
+  GLint location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_model");
+  glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+  glUniformMatrix4fv(location, 1, GL_FALSE, &model[0][0]);
+
+  glBindVertexArray(gGrid.mVertexArrayObject);
+
+  // 1
+  glBindBuffer(GL_ARRAY_BUFFER, gGrid.mVertexBufferObjectH);
+  glBufferData(GL_ARRAY_BUFFER,
+               gGrid.mVertexDataH.size() * sizeof(glm::vec3),
+               gGrid.mVertexDataH.data(),
+               GL_STATIC_DRAW);
+
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0,
+                        3,
+                        GL_FLOAT,
+                        false,
+                        0,
+                        (void*)0);
+
+  glDrawArrays(GL_LINES, 0, gGrid.mVertexDataH.size());
+
+  // 2
+  glBindBuffer(GL_ARRAY_BUFFER, gGrid.mVertexBufferObjectV);
+  glBufferData(GL_ARRAY_BUFFER,
+               gGrid.mVertexDataV.size() * sizeof(glm::vec3),
+               gGrid.mVertexDataV.data(),
+               GL_STATIC_DRAW);
+
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0,
+                        3,
+                        GL_FLOAT,
+                        false,
+                        0,
+                        (void*)0);
+
+  glDrawArrays(GL_LINES, 0, gGrid.mVertexDataV.size());
+
+  glBindVertexArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glDisableVertexAttribArray(0);
+}
+
+
 template <typename T>
 void MeshTransformation(App* app, Mesh3D<T>* mesh)
 {
@@ -376,7 +480,6 @@ void MeshTransformation(App* app, Mesh3D<T>* mesh)
   model = glm::rotate(model, glm::radians(mesh->mRotate), glm::vec3(0.0f, 1.0f, 0.0f));
   model = glm::scale(model, mesh->mScale);
   glUniformMatrix4fv(location, 1, GL_FALSE, &model[0][0]);
-
 
   // World to camera
   location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_view");
@@ -413,6 +516,8 @@ void mainLoop(App* app, std::vector<Mesh3D<T>> meshes)
     Input(app);
     PreDraw(app);
 
+    DisplayGrid(app);
+
     for (Mesh3D<T> mesh : meshes)
     {
       MeshTransformation(app, &mesh);
@@ -441,12 +546,13 @@ void ObjectCreation(std::vector<Mesh3D<GLfloat>>& meshes)
 
   bench.name = "Bench";
   bench.mScale = glm::vec3(0.07f, 0.057f, 0.05f);
+  bench.mOffset = glm::vec3(-0.6f, 0.0f, -2.6f);
   bench.mModelPath = "Models/BenchTextured.obj";
   bench.mTexturePath = "Models/textures/combinedBenchTexture.png";
 
   podium.name = "Podium";
   podium.mScale = glm::vec3(0.14f, 0.14f, 0.11f);
-  podium.mOffset = glm::vec3(-1.2f, 0.95f, 0.9f);
+  podium.mOffset = glm::vec3(-1.8f, 1.27f, -1.7f);
   podium.mModelPath = "Models/podium.obj";
 
   meshes.push_back(bench);
@@ -505,6 +611,13 @@ int main()
 {
   initialization(&gApp);
   createGraphicsPipeline(&gApp);
+
+  // ~~~~~~~~~~~~ HELPER 
+  
+  initializeGrid();
+
+  // HELPER END ~~~~~~~~
+
 
   std::vector<Mesh3D<GLfloat>> meshes;
   ObjectCreation(meshes);
