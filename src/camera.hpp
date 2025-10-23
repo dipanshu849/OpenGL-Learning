@@ -16,6 +16,7 @@ class Camera
   public:
     Camera();
     glm::mat4 getViewMatrix();
+    glm::vec3 getViewPos();
     void moveForward(float);
     void moveBackward(float);
     void moveLeft(float);

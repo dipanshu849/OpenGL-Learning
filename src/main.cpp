@@ -33,6 +33,7 @@
 #include "camera.hpp"
 #include "loadModel.hpp"
 
+
 struct App
 {
   int mScreenWidth = 800;
@@ -48,6 +49,8 @@ struct App
 
   GLfloat mDeltaTime = 0;
   GLfloat mLastFrame = glfwGetTime();
+
+  int mIsPhong = 1;
 };
 
 
@@ -55,8 +58,11 @@ template <typename T>
 struct Mesh3D
 {
   GLuint mVertexArrayObject = 0;
+
   GLuint mPositionVertexBufferObject = 0;
   GLuint mUvVertexBufferObject = 0;
+  GLuint mNormalVertexBufferObject = 0;
+
   GLuint mTextureObject = 0;
   
   // we can use glfoat or glm::vec3 direct
@@ -88,6 +94,7 @@ struct Grid
   float mTileSize = 1.0f;
 };
 
+
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GLOBALS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 App gApp;
 Grid gGrid;
@@ -95,7 +102,6 @@ Grid gGrid;
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~ ERROR HANDLING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 static void GLClearAllErrors()
 {
   while(glGetError() != GL_NO_ERROR);
@@ -115,7 +121,6 @@ static bool GLCheckErrorStatus(const char* function, int line)
 }
 
 #define GLCheck(x) GLClearAllErrors(); x; GLCheckErrorStatus(#x, __LINE__);
-
 // ~~~~~~~~~~~~~~~~~~~~~~~~~ ERROR HANDLING END ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -149,6 +154,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
     case GLFW_KEY_DOWN:
       gApp.mCamera.moveDown(cameraSpeed);
+      break;
+
+    case GLFW_KEY_C:
+      gApp.mIsPhong = !gApp.mIsPhong;
+      std::cout << "Phong Shading: " << gApp.mIsPhong << std::endl;
       break;
   }
 }
@@ -227,6 +237,8 @@ void initializeGrid()
 
   glGenBuffers(1, &gGrid.mVertexBufferObjectH);
   glGenBuffers(1, &gGrid.mVertexBufferObjectV);
+  // we will fill the buffers in `DisplayGrid` function
+  // as we are using 2 position vbo's for convinence
 }
 
 
@@ -247,6 +259,7 @@ bool meshCreate(const char* path, Mesh3D<T> *mesh)
   mesh->mVertexData = vertexData;
   mesh->mUvData = uvData;
   mesh->mNormalData = normalData;
+
   return true;
 }
 
@@ -278,7 +291,7 @@ bool loadTexture(const char* path, Mesh3D<T> *mesh)
      // std::cout << "Width of texture: " << width << std::endl;
      // std::cout << "Height of texture: " << height << std::endl;
 
-    GLCheck(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
   }
   else
@@ -336,9 +349,26 @@ void meshCTGdataTransfer(Mesh3D<T>* mesh)
                         0,
                         (void*)0);
 
+  // 3. start generating our normals VBO
+  glGenBuffers(1, &mesh->mNormalVertexBufferObject);
+  glBindBuffer(GL_ARRAY_BUFFER, mesh->mNormalVertexBufferObject);
+  glBufferData(GL_ARRAY_BUFFER,
+              mesh->mNormalData.size() * sizeof(T),
+              mesh->mNormalData.data(),
+              GL_STATIC_DRAW);
+
+  //    Linking the normal attrib in VAO
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2,
+                        3,
+                        GL_FLOAT,
+                        false,
+                        0,
+                        (void*)0);
   glBindVertexArray(0);
   glDisableVertexAttribArray(0); 
   glDisableVertexAttribArray(1);
+  glDisableVertexAttribArray(2);
 }
 
 
@@ -402,6 +432,8 @@ void createGraphicsPipeline(App* app)
     app->mGraphicsPipelineShaderProgram = createShaderProgram(vertexShaderSource, fragmentShaderSource);
 }
 // ~~~~~~~~~~~~~~~~~~ Graphics Pipline Setup END ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 void Input(App* app)
 {
   if(glfwGetKey(app->mWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -431,7 +463,7 @@ void DisplayGrid(App* app)
 
   glBindVertexArray(gGrid.mVertexArrayObject);
 
-  // 1
+  // 1 -> Drawing horizontal lines
   glBindBuffer(GL_ARRAY_BUFFER, gGrid.mVertexBufferObjectH);
   glBufferData(GL_ARRAY_BUFFER,
                gGrid.mVertexDataH.size() * sizeof(glm::vec3),
@@ -448,7 +480,7 @@ void DisplayGrid(App* app)
 
   glDrawArrays(GL_LINES, 0, gGrid.mVertexDataH.size());
 
-  // 2
+  // 2 -> Drawing vertical lines
   glBindBuffer(GL_ARRAY_BUFFER, gGrid.mVertexBufferObjectV);
   glBufferData(GL_ARRAY_BUFFER,
                gGrid.mVertexDataV.size() * sizeof(glm::vec3),
@@ -491,6 +523,27 @@ void MeshTransformation(App* app, Mesh3D<T>* mesh)
   location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_projection");
   glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)app->mScreenWidth/app->mScreenHeight, 0.1f, 100.0f);
   glUniformMatrix4fv(location, 1, GL_FALSE, &projection[0][0]);
+
+
+  // LightPosition
+  location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_lightPos");
+  glm::vec3 lightPos = glm::vec3(0.0f, 5.0f, 0.0f);
+  glUniform3f(location, lightPos.x, lightPos.y, lightPos.z);
+
+
+  // LightColor
+  location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_lightColor");
+  glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+  glUniform3f(location, lightColor.x, lightColor.y, lightColor.z);
+
+  // ViewPosition
+  location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_viewPos");
+  glm::vec3 viewPos = app->mCamera.getViewPos();
+  glUniform3f(location, viewPos.x, viewPos.y, viewPos.z);
+
+  // toggleShading
+  location = glGetUniformLocation(app->mGraphicsPipelineShaderProgram, "u_isPhong");
+  glUniform1i(location, app->mIsPhong);
 }
 
 
@@ -546,13 +599,13 @@ void ObjectCreation(std::vector<Mesh3D<GLfloat>>& meshes)
 
   bench.name = "Bench";
   bench.mScale = glm::vec3(0.07f, 0.057f, 0.05f);
-  bench.mOffset = glm::vec3(-0.6f, 0.0f, -2.6f);
+  bench.mOffset = glm::vec3(-0.6f, 0.1f, -2.6f);
   bench.mModelPath = "Models/BenchTextured.obj";
   bench.mTexturePath = "Models/textures/combinedBenchTexture.png";
 
   podium.name = "Podium";
   podium.mScale = glm::vec3(0.14f, 0.14f, 0.11f);
-  podium.mOffset = glm::vec3(-1.8f, 1.27f, -1.7f);
+  podium.mOffset = glm::vec3(-1.8f, 1.26f, -1.7f);
   podium.mModelPath = "Models/podium.obj";
 
   meshes.push_back(bench);

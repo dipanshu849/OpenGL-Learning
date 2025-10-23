@@ -10,7 +10,7 @@
 */
 /*
   m_targetPosition acts like the inital looking postion for out camera
-  But, when we are moving the camera the would be m_eye + m_targetPosition
+  But, when we are moving the camera that would be m_eye + m_targetPosition
 */
 
 Camera::Camera()
@@ -29,6 +29,13 @@ glm::mat4 Camera::getViewMatrix()
 {
   return glm::lookAt(m_eye, m_eye +  m_targetPosition, m_upDirection);
 }
+
+
+glm::vec3 Camera::getViewPos()
+{
+  return m_eye;
+}
+
 
 void Camera::moveForward(float speed)
 {
