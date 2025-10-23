@@ -25,7 +25,7 @@ vec3 PhongShading()
   float diff = max(dot(norm, lightDir), 0.0);
   vec3 diffuse = diff * u_lightColor;
 
-  // specular [left]
+  // specular 
   float specularStrength = 0.5;
   vec3 viewDir = normalize(u_viewPos - o_fragPos);
   vec3 reflectDir = reflect(-lightDir, norm);

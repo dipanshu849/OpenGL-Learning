@@ -158,7 +158,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
     case GLFW_KEY_C:
       gApp.mIsPhong = !gApp.mIsPhong;
-      std::cout << "Phong Shading: " << gApp.mIsPhong << std::endl;
       break;
   }
 }
@@ -596,6 +595,7 @@ void ObjectCreation(std::vector<Mesh3D<GLfloat>>& meshes)
 {
   Mesh3D<GLfloat> bench;
   Mesh3D<GLfloat> podium;
+  Mesh3D<GLfloat> table;
 
   bench.name = "Bench";
   bench.mScale = glm::vec3(0.07f, 0.057f, 0.05f);
@@ -605,11 +605,18 @@ void ObjectCreation(std::vector<Mesh3D<GLfloat>>& meshes)
 
   podium.name = "Podium";
   podium.mScale = glm::vec3(0.14f, 0.14f, 0.11f);
-  podium.mOffset = glm::vec3(-1.8f, 1.26f, -1.7f);
+  podium.mOffset = glm::vec3(-2.34f, 1.26f, -1.7f);
   podium.mModelPath = "Models/podium.obj";
+
+  table.name = "Table";
+  table.mScale = glm::vec3(0.07f, 0.06f, 0.06f);
+  table.mOffset = glm::vec3(-3.4f, 0.0f, -3.9f);
+  table.mModelPath = "Models/table.obj";
+  table.mTexturePath = "Models/textures/table/table_combined_texture_new.jpeg";
 
   meshes.push_back(bench);
   meshes.push_back(podium);
+  meshes.push_back(table);
 }
 
 
